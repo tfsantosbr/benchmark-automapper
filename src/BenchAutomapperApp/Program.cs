@@ -32,13 +32,23 @@ namespace BenchAutomapperApp
                 {
                     Name = "User",
                     Birthdate = new DateTime(1950, 5, 1),
-                    Salary = 100000
+                    Salary = 100000,
+
                 }));
 
             Enumerable
                 .Range(1, 1000000)
                 .ToList()
-                .ForEach(i => _users.Add(new User("User", new DateTime(1950, 5, 1), 100000)));
+                .ForEach(i => _users.Add(new User(
+                    "User",
+                    new DateTime(1950, 5, 1),
+                    100000,
+                    new Address(
+                           "0511124",
+                           "Street",
+                           "123",
+                           "Country")
+                       )));
 
             var config = new MapperConfiguration(cfg =>
             {
@@ -54,7 +64,16 @@ namespace BenchAutomapperApp
             var users = new List<User>();
 
             foreach (var createUser in _createUsers)
-                users.Add(new User(createUser.Name, createUser.Birthdate, createUser.Salary));
+                users.Add(new User(
+                    createUser.Name,
+                    createUser.Birthdate,
+                    createUser.Salary,
+                    new Address(
+                           createUser.ZipCode,
+                           createUser.Street,
+                           createUser.Number,
+                           createUser.Country)
+                       ));
 
             return users;
         }
@@ -62,9 +81,7 @@ namespace BenchAutomapperApp
         [Benchmark]
         public List<User> AutomapperCreate()
         {
-            var users = _mapper.Map<List<User>>(_createUsers);
-
-            return users;
+            return _mapper.Map<List<User>>(_createUsers);
         }
 
         [Benchmark]
@@ -79,7 +96,11 @@ namespace BenchAutomapperApp
                     Id = user.Id,
                     Name = user.Name,
                     Birthdate = user.Birthdate,
-                    Salary = user.Salary
+                    Salary = user.Salary,
+                    ZipCode = user.Address.ZipCode,
+                    Number = user.Address.ZipCode,
+                    Country = user.Address.ZipCode,
+                    Street = user.Address.Street
                 });
             }
 
@@ -95,18 +116,36 @@ namespace BenchAutomapperApp
 
     public class User
     {
-        public User(string name, DateTime birthdate, decimal salary)
+        public User(string name, DateTime birthdate, decimal salary, Address address)
         {
             Id = Guid.NewGuid();
             Name = name;
             Birthdate = birthdate;
             Salary = salary;
+            Address = address;
         }
 
         public Guid Id { get; private set; }
         public string Name { get; private set; }
         public DateTime Birthdate { get; private set; }
         public decimal Salary { get; private set; }
+        public Address Address { get; private set; }
+    }
+
+    public struct Address
+    {
+        public Address(string zipCode, string street, string number, string country)
+        {
+            ZipCode = zipCode;
+            Street = street;
+            Number = number;
+            Country = country;
+        }
+
+        public string ZipCode { get; private set; }
+        public string Street { get; private set; }
+        public string Number { get; private set; }
+        public string Country { get; private set; }
     }
 
     public class UserDetails
@@ -115,6 +154,11 @@ namespace BenchAutomapperApp
         public string Name { get; set; }
         public DateTime Birthdate { get; set; }
         public decimal Salary { get; set; }
+
+        public string ZipCode { get; set; }
+        public string Street { get; set; }
+        public string Number { get; set; }
+        public string Country { get; set; }
     }
 
     public class CreateUser
@@ -122,6 +166,11 @@ namespace BenchAutomapperApp
         public string Name { get; set; }
         public DateTime Birthdate { get; set; }
         public decimal Salary { get; set; }
+
+        public string ZipCode { get; set; }
+        public string Street { get; set; }
+        public string Number { get; set; }
+        public string Country { get; set; }
     }
 
     public class UserProfile : Profile
@@ -131,10 +180,24 @@ namespace BenchAutomapperApp
             CreateMap<CreateUser, User>()
                .ConstructUsing((createUser, context) =>
                {
-                   return new User(createUser.Name, createUser.Birthdate, createUser.Salary);
+                   return new User(
+                       createUser.Name,
+                       createUser.Birthdate,
+                       createUser.Salary,
+                       new Address(
+                           createUser.ZipCode,
+                           createUser.Street,
+                           createUser.Number,
+                           createUser.Country)
+                       );
                });
 
-            CreateMap<User, UserDetails>();
+            CreateMap<User, UserDetails>()
+                .ForMember(d => d.ZipCode, o => o.MapFrom(s => s.Address.ZipCode))
+                .ForMember(d => d.Street, o => o.MapFrom(s => s.Address.Street))
+                .ForMember(d => d.Number, o => o.MapFrom(s => s.Address.Number))
+                .ForMember(d => d.Country, o => o.MapFrom(s => s.Address.Country))
+                ;
         }
     }
 }
